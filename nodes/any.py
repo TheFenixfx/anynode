@@ -399,7 +399,7 @@ class AnyNode:
         """Takes the prompt and inputs, Generates a function with an LLM for the Node"""
         if prompt == "": # if empty, reset
             self.reset()
-            return (any, any2,)c
+            return (any, any2,)
         result = None
         registry = self.FUNCTION_REGISTRY
         # Generate a unique function name
