@@ -111,9 +111,11 @@ def generated_function(input_data_1=None, input_data_2=None):
 ## Write the Code
 """
 
+
 class AnyNode:
     """Ask it to make up any node for you. """
-  
+
+    # ... (rest of the class code)
     NAME = "AnyNode"
     CATEGORY = "utils"
   
@@ -138,10 +140,67 @@ class AnyNode:
         self.last_comment = None
         self.attempts = 0
     
+
     @classmethod
     def INPUT_TYPES(self):  # pylint: disable = invalid-name, missing-function-docstring
         return {
             "required": {
+                "prompt_template": ("STRING", {
+                    "multiline": True,
+                    "default": """
+                        # Coding a Python Function
+                        You are an expert python coder who specializes in writing custom nodes for ComfyUI.
+
+                        ## Available Python Modules
+                        It is not required to use any of these libraries, but if you do use any import in your code it must be on this list:
+                        [[IMPORTS]]
+
+                        ## Input Data
+                        Here is some important information about the input data:
+                        - input_data_1: [[INPUT1]]
+                        - input_data_2: [[INPUT2]]
+                        [[CONNECTIONS]][[EXAMPLES]][[CODEBLOCK]]
+                        ## Coding Instructions
+                        - Your job is to code the user's requested node given the inputs and desired output type.
+                        - Respond with only a brief plan and the code in one function named generated_function that takes two kwargs named 'input_data_1' and 'input_data_2'.
+                        - All functions you must define should be inner functions of generated_function.
+                        - You may briefly plan your code in plain text, but after write only the code contents of the function itself inside of a `python` code block.
+                        - Do include needed available imports in your code before the function.
+                        - If the request is simple enough to do without imports, like math, just do that.
+                        - If an input is a Tensor and the output is a Tensor, it should be the same shape unless otherwise specified by the user.
+                        - Image tensors come in the shape (batch, width, height, rgb_channels), if outputting an image, use the same shape as the input image tensor.
+                            - To know the tensor is an image, it will come with the last dimension as 3
+                            - An example image tensor for a single 512x786 image: (1, 512, 786, 3)
+                            - An animation is a tensor with a larger batch of images of the same shape
+                        - Your resulting code should be as compute efficient as possible.
+                        - Make sure to deallocate memory for anything which uses it.
+                        - You may not use `open` or fetch files from the internet.
+                        - If there is a code block above, insure that the the generated_function args and kwargs match the example below.
+
+                        ### Example Generated function:
+                        User: output a list of all prime numbers up to the input number
+                        ```python
+                        import math
+                        def generated_function(input_data_1=None, input_data_2=None):
+                            def is_prime(n):
+                                if n <= 1:
+                                    return False
+                                for i in range(2, int(math.sqrt(n))+1):
+                                    if n % i == 0:
+                                        return False
+                                return True
+                            primes = []
+                            num = input_data_1
+                            while num > 1:
+                                if is_prime(num):
+                                    primes.append(num)
+                                num -= 1
+                            return primes
+                        ```
+
+                        ## Write the Code
+                    """,
+                }),
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "Take the input and multiply by 5",
@@ -160,7 +219,9 @@ class AnyNode:
                 "extra_pnginfo": "EXTRA_PNGINFO",
             },
         }
-  
+
+    # ... (rest of the class code)
+
     @classmethod
     def IS_CHANGED(s, image, string_field, int_field, float_field, print_to_screen):
         return time.time()
@@ -175,7 +236,8 @@ class AnyNode:
     VERSION = "0.1.2"
     FUNCTION_REGISTRY = FunctionRegistry(schema="default", version=VERSION)
     
-    def render_template(self, template:str, any=None, any2=None, seed=None, workflow:NodeAware=None, node=None):
+
+    def render_template(self, template: str, any=None, any2=None, seed=None, workflow: NodeAware=None, node=None):
         """Render the system prompt template with current state"""
         varinfo = [variable_info(any), variable_info(any2)]
         print(f"LE: {self.last_error}")
@@ -192,7 +254,7 @@ class AnyNode:
             .replace("[[CODEBLOCK]]", "" if not self.script else f"\n## Current Code\n{instruction}\n```python\n{self.script}\n```\n")
             # This is the case where we call from error mitigation
         return r
-  
+
     def get_response(self, system_message:str, prompt:str, model=None, **kwargs) -> str:
         """Calls OpenAI With System Message and Prompt. Overriden in classes that extend this."""
         if model:
@@ -211,12 +273,13 @@ class AnyNode:
           # Extract the response text
         r = response.choices[0].message.content.strip()
         return r
-  
+
+
     def get_llm_response(self, prompt:str, any=None, any2=None, workflow=None, node=None, model=None, **kwargs) -> str:
         """Calls OpenAI and returns response"""
         try:
             print(f"INPUT ({type(any)}, {type(any2)})")
-            final_template = self.render_template(SYSTEM_TEMPLATE, any=any, any2=any2, workflow=workflow, node=node)
+            final_template = self.render_template(self.prompt_template, any=any, any2=any2, workflow=workflow, node=node)
             print(final_template)
             r = self.get_response(final_template, prompt, model=model, **kwargs)
             code_block = self.extract_code_block(r)
@@ -224,7 +287,9 @@ class AnyNode:
             return code_block
         except Exception as e:
             return f"An error occurred: {e}"
-  
+
+    # ... (rest of the class code)
+    
     def extract_code_block(self, response: str) -> str:
         """
         Extracts the code block from the response using regex.
@@ -326,13 +391,15 @@ class AnyNode:
         self.attempts += 1
         return r
       
-    def go(self, prompt:str, model=None, any=None, any2=None, hidden_prompt=None, unique_id=None, extra_pnginfo=None, **kwargs):
+
+    def go(self, prompt_template: str, prompt: str, model=None, any=None, any2=None, hidden_prompt=None, unique_id=None, extra_pnginfo=None, **kwargs):
         print(f"\nRUN-{unique_id}", model, prompt, any, any2, "\n")
         self.model = model
+        self.prompt_template = prompt_template  # Store the custom prompt template
         """Takes the prompt and inputs, Generates a function with an LLM for the Node"""
         if prompt == "": # if empty, reset
             self.reset()
-            return (any, any2,)
+            return (any, any2,)c
         result = None
         registry = self.FUNCTION_REGISTRY
         # Generate a unique function name
@@ -340,7 +407,7 @@ class AnyNode:
 
         workflow = NodeAware(pnginfo=extra_pnginfo)
         node = workflow.find_node(id=unique_id)
-        
+
         # Generate, Compile and Run the Unique Generated Function: 3 Attempts
         while self.keep_trying():
 
@@ -352,7 +419,7 @@ class AnyNode:
                 print("Generating Node function...")
                 # Generate the function code using OpenAI
                 r = self.get_llm_response(prompt, any=any, any2=any2, workflow=workflow, node=node, model=model, **kwargs)
-                
+
                 # Remember the script for future use
                 self.script = self.extract_imports(r)
                 print(f"Stored script:\n{self.script}")
@@ -399,7 +466,7 @@ class AnyNode:
                     continue
             else:
                 print(f"Function '{function_name}' not found in generated code.")
-                
+
             break
 
         self.last_error = None
@@ -420,7 +487,8 @@ class AnyNode:
         }
 
         return (result, control,)
- 
+
+
 class AnyNodeGemini(AnyNode):
     def __init__(self, api_key=None):
         super().__init__()
